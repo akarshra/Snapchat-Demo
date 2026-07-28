@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% block main %}
+{% load humanize %}
+<div class="dock absolute gap-2 px-4 justify-start top-0 shadow-xs dock-lg">
+    <div class="max-w-[20px]">
+        <a href="{% url 'home' %}" class="cursor-pointer">
+            <i class="fa-solid fa-chevron-left"></i>
+        </a>
+    </div>
+    <div class="max-w-full w-full flex flex-row justify-start items-center gap-3">
+        <div class="avatar">
+            <div class="w-10 h-10 rounded-full overflow-hidden">
+                <img src="{% if friend.avatar %}{{ friend.avatar.url }}{% else %}/static/snaps/default.jpg{% endif %}" class="w-full h-full object-cover" />
+            </div>
+        </div>
+        <p class="font-semibold text-gray-800"> {{ friend.username }} </p>
+    </div>
+    <div class="flex flex-row justify-end gap-2 items-center">
+        <button onclick="startCall('voice')" class="btn btn-ghost btn-circle btn-sm hover:bg-gray-100 flex items-center justify-center" title="Voice Call">
+            <i class="fa-solid fa-lg fa-phone text-gray-700"></i>
+        </button>
+        <button onclick="startCall('video')" class="btn btn-ghost btn-circle btn-sm hover:bg-gray-100 flex items-center justify-center" title="Video Call">
+            <i class="fa-solid fa-lg fa-video text-gray-700"></i>
+        </button>
+    </div>
+</div>
+
+<main class="left-0 right-0 top-[80px] bottom-[80px] absolute overflow-y-auto">
+    <div class="min-h-full flex flex-col justify-end px-4">
+        {% for message in chat_messages %}
+        {% if message.sender == request.user %}
+        <div class="chat chat-end">
+            <div class="chat-header">
+                {{ message.sender }}
+                <time class="text-xs opacity-50">{{ message.created_at | timesince }}</time>
+            </div>
+            {% if message.text %}
+            <div class="chat-bubble">{{ message.text }}</div>
+            {% else %}
+            <div class="chat-bubble p-0 max-w-24 aspect-3/4 rounded-lg overflow-hidden">
+                <img src="{{  message.image.url }}" alt="{{ message.image.name }}" class="w-full h-full object-cover">
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="chat chat-start">
+            <div class="chat-header">
+                {{ message.sender }}
+                <time class="text-xs opacity-50">{{ message.created_at | timesince }}</time>
+            </div>
+            {% if message.text %}
+            <div class="chat-bubble">{{ message.text }}</div>
+            {% else %}
+            <div class="chat-bubble p-0 max-w-24 aspect-3/4 rounded-lg overflow-hidden">
+                <img src="{{  message.image.url }}" alt="{{ message.image.name }}" class="w-full h-full object-cover">
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+</main>
+<div id="preview-dock"
+    class="dock bg-base-200  absolute gap-2 px-4 justify-start bottom-[72px] shadow-xs dock-lg hidden">
+
+    <div class="flex flex-row justify-start gap-4 max-w-full">
+        <div id="preview-container" class="w-12 h-12 rounded-md overflow-hidden">
+        </div>
+        <div class="grow flex justify-between items-center flex-row">
+            <p id="caption" class="max-w-[20ch] truncate text-xs font-light">Click the button to watch on Jetflix app.</p>
+            <button id="close-preview" type="button" class="btn btn-ghost btn-circle btn-xs flex items-center justify-center">
+                <i class="fa-solid fa-xmark text-gray-500"></i>
+            </button>
+        </div>
+    </div>
+</div>
+<div class="dock absolute gap-2 px-4 justify-start bottom-0 shadow-xs dock-lg">
+    <button id="file-button" type="button" class="max-w-10 rounded-full btn btn-square text-white bg-black" title="Open camera">
+        <i class="fa-solid fa-camera"></i>
+    </button>
+    <button id="upload-photo-button" type="button" class="max-w-10 rounded-full btn btn-square text-white bg-gray-700" title="Upload photo from device">
+        <i class="fa-solid fa-image"></i>
+    </button>
+    <form action="{% url 'send-message' friend.id %}" method="post" enctype="multipart/form-data"
+        class="max-w-full flex flex-row gap-2 items-center">
+        {% csrf_token %}
+        <input id="snap-file" name="image" type="file" class="hidden">
+        <input name="message" type="text" class="rounded-full input input-border" placeholder="Send chat">
+        <button type="submit" name="target" value="chat" class="rounded-full btn btn-square text-white bg-blue-500">
+            <i class="fa-solid fa-arrow-up"></i>
+        </button>
+        <button type="submit" name="target" value="all_friends" class="rounded-full btn btn-sm text-gray-700 bg-yellow-300 border-none">
+            <i class="fa-solid fa-users"></i>
+        </button>
+    </form>
+</div>
+
+
+<div id="calling-modal" class="fixed inset-0 bg-gray-950 z-[9999] flex flex-col justify-between items-center py-16 hidden">
+    <div class="flex flex-col items-center gap-6 mt-12">
+        <div class="avatar">
+            <div class="w-24 h-24 rounded-full ring-4 ring-yellow-400 ring-offset-4 overflow-hidden">
+                <img src="{% if friend.avatar %}{{ friend.avatar.url }}{% else %}/static/snaps/default.jpg{% endif %}" class="w-full h-full object-cover" />
+            </div>
+        </div>
+        <div class="text-center">
+            <h2 class="text-2xl font-bold text-white">{{ friend.username }}</h2>
+            <p id="call-status" class="text-gray-400 mt-2 text-sm tracking-widest uppercase animate-pulse">Calling...</p>
+        </div>
+    </div>
+    
+    
+    <div id="video-container" class="w-64 h-96 bg-black rounded-2xl overflow-hidden relative border border-white/10 hidden shadow-2xl">
+        <video id="call-video-preview" class="w-full h-full object-cover" autoplay playsinline muted></video>
+    </div>
+
+    <div class="flex flex-col items-center gap-6 mb-8">
+        <button onclick="endCall()" class="w-16 h-16 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg transition-transform active:scale-95">
+            <i class="fa-solid fa-phone-slash text-2xl"></i>
+        </button>
+    </div>
+</div>
+<div id="camera-context" class="hidden" data-chat-user-id="{{ friend.id }}" data-chat-username="{{ friend.username }}"></div>
+{% endblock %}

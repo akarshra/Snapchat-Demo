@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block main %}
+<div class="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-4 bg-white border-b border-gray-100 z-[1000]">
+    <div class="w-10 flex justify-start">
+        <a href="{% url 'home' %}" class="cursor-pointer text-gray-800 hover:text-black flex items-center">
+            <i class="fa-solid fa-chevron-down text-lg"></i>
+        </a>
+    </div>
+    <h1 class="text-lg font-bold text-center grow text-gray-800">Notifications</h1>
+    <div class="w-10"></div> 
+</div>
+
+<main class="mt-24 px-4 overflow-y-auto" style="height: calc(100% - 100px);">
+    <ul class="space-y-6">
+        {% for notif in notifications %}
+        <li class="flex items-center justify-between p-2 hover:bg-gray-50 rounded-xl transition-colors">
+            <div class="flex flex-row gap-4 items-center">
+                <div class="avatar">
+                    <div class="ring-purple-600 w-10 h-10 rounded-full ring-2 ring-offset-2 overflow-hidden">
+                        <img src="{{ notif.avatar_url }}" class="w-full h-full object-cover" />
+                    </div>
+                </div>
+                <div>
+                    <h2 class="font-semibold text-gray-850 text-sm">{{ notif.title }}</h2>
+                    <p class="text-xs text-gray-400 leading-normal">{{ notif.text }}</p>
+                </div>
+            </div>
+
+            <div class="flex-shrink-0 pl-2">
+                {% if notif.type == 'friend_request' %}
+                    <form action="{{ notif.action_url }}" method="post" class="m-0">
+                        {% csrf_token %}
+                        <button type="submit"
+                            class="btn btn-sm border-none outline-none rounded-full bg-yellow-300 hover:bg-yellow-400 text-gray-800 font-bold px-4 py-1 text-xs cursor-pointer">
+                            <i class="fa-solid fa-user-plus mr-1"></i>
+                            Accept
+                        </button>
+                    </form>
+                {% else %}
+                    <a href="{{ notif.action_url }}"
+                        class="btn btn-sm border-none outline-none rounded-full bg-blue-500 hover:bg-blue-600 text-white font-bold px-4 py-1 text-xs cursor-pointer flex items-center justify-center">
+                        View
+                    </a>
+                {% endif %}
+            </div>
+        </li>
+        {% empty %}
+        <p class="text-gray-400 text-xs text-center mt-12">No new notifications :)</p>
+        {% endfor %}
+    </ul>
+</main>
+{% endblock %}

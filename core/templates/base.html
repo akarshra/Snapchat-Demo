@@ -1,0 +1,136 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snapchat</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,100..900;1,100..900&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://kit.fontawesome.com/06fd46cb4b.js" crossorigin="anonymous"></script>
+    <style>
+        * {
+            font-family: "Public Sans", sans-serif;
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body>
+    <div class="h-screen bg-gray-900 flex justify-center items-center">
+        <div class="h-full relative sm:h-[90vh] bg-white w-full sm:max-w-96 sm:rounded-lg">
+            {% block main %}
+            {% endblock %}
+
+            <div id="camera-modal" class="absolute inset-0 bg-black z-[5000] flex flex-col justify-between py-6 px-4 hidden sm:rounded-lg overflow-hidden">
+                
+                <div id="camera-header" class="flex justify-between items-center z-10">
+                    <button onclick="closeCameraModal()" class="text-white text-xl p-2 hover:bg-white/10 rounded-full transition-colors flex items-center justify-center size-10 bg-transparent border-none cursor-pointer">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                    <span class="text-white font-semibold text-sm">Snap Camera</span>
+                    <button class="text-white text-xl p-2 hover:bg-white/10 rounded-full transition-colors flex items-center justify-center size-10 bg-transparent border-none cursor-pointer">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                </div>
+
+                <div class="absolute inset-0 z-0 bg-gray-900 flex justify-center items-center">
+                    <video id="camera-stream" class="w-full h-full object-cover" autoplay playsinline muted></video>
+                   
+                    <div id="camera-fallback" class="hidden flex flex-col items-center justify-center text-center p-6 text-white w-full h-full bg-gray-900 z-20">
+                        <i class="fa-solid fa-video-slash text-5xl mb-4 text-gray-500"></i>
+                        <p class="text-sm font-semibold">Camera access unavailable.</p>
+                        <p class="text-xs text-gray-400 mt-2">Please select an image file to mock camera capture instead.</p>
+                        <button onclick="triggerMockCaptureUpload()" class="btn btn-sm btn-warning mt-4 rounded-full border-none px-4 py-2 font-bold cursor-pointer">
+                            <i class="fa-solid fa-image"></i> Choose Image
+                        </button>
+                        <input id="camera-mock-upload" type="file" accept="image/*" class="hidden">
+                    </div>
+                </div>
+
+                <div id="capture-preview-container" class="absolute inset-0 z-10 bg-black hidden flex flex-col justify-between py-6 px-4">
+                    <div class="flex justify-between items-center z-10">
+                        <button onclick="retakePhoto()" class="text-white text-xl p-2 hover:bg-white/10 rounded-full transition-colors flex items-center justify-center size-10 bg-transparent border-none cursor-pointer">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </button>
+                        <span class="text-white font-semibold text-sm">Send Snap</span>
+                        <div class="size-10"></div>
+                    </div>
+                    
+                    <div class="absolute inset-0 z-0 bg-black flex justify-center items-center">
+                        <img id="captured-image-view" class="w-full h-full object-contain" />
+                    </div>
+
+                    <div class="z-10 mt-auto flex flex-col gap-3 w-full bg-black/60 p-4 rounded-2xl backdrop-blur-md">
+                        <div class="flex flex-col gap-2">
+                            <div class="flex gap-2">
+                                <button onclick="sendCapturedSnapToTarget('chat')" class="btn btn-neutral grow rounded-full text-white bg-gray-800 hover:bg-gray-700 flex items-center justify-center gap-2 py-3 border-none cursor-pointer font-bold">
+                                    <i class="fa-solid fa-paper-plane"></i> Send to chat
+                                </button>
+                                <button onclick="sendCapturedSnapToTarget('all_friends')" class="btn btn-primary grow rounded-full text-black bg-yellow-400 hover:bg-yellow-500 border-none flex items-center justify-center gap-2 py-3 cursor-pointer font-bold">
+                                    <i class="fa-solid fa-users"></i> All friends
+                                </button>
+                            </div>
+                            <div class="flex justify-between items-center gap-2">
+                                <button onclick="postToMyStory()" class="btn btn-neutral grow rounded-full text-white bg-gray-800 hover:bg-gray-700 flex items-center justify-center gap-2 py-3 border-none cursor-pointer font-bold">
+                                    <i class="fa-solid fa-circle-play text-yellow-400"></i> My Story
+                                </button>
+                                <div class="dropdown dropdown-top dropdown-end grow z-[6000]">
+                                    <div tabindex="0" role="button" class="btn btn-primary w-full rounded-full text-black bg-yellow-400 hover:bg-yellow-500 border-none flex items-center justify-center gap-2 py-3 cursor-pointer font-bold">
+                                        <i class="fa-solid fa-paper-plane"></i> Send To...
+                                    </div>
+                                    <ul tabindex="0" id="camera-friends-list" class="dropdown-content menu bg-white text-gray-800 rounded-box w-64 p-2 shadow-xl max-h-60 overflow-y-auto mb-2 border border-gray-150">
+                                  
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="shutter-button-container" class="z-10 flex justify-center items-center mb-8">
+                    <button onclick="capturePhoto()" class="size-20 bg-transparent hover:scale-105 active:scale-95 border-[6px] border-white rounded-full flex items-center justify-center transition-all shadow-md focus:outline-none cursor-pointer">
+                        <span class="size-[60px] bg-white rounded-full block"></span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="stories-modal" class="absolute inset-0 bg-neutral-900 z-[5000] flex flex-col justify-between py-4 px-4 hidden sm:rounded-lg overflow-hidden">
+                
+                <div id="story-progress-bar" class="w-full flex gap-1 z-10">
+                    
+                </div>
+                
+                <div class="flex justify-between items-center z-10 mt-2">
+                    <div class="flex items-center gap-2 text-white">
+                        <div class="w-8 h-8 rounded-full border border-white/20 overflow-hidden bg-white">
+                            <img id="story-user-avatar" class="w-full h-full object-cover animate-pulse" />
+                        </div>
+                        <span id="story-username" class="font-bold text-sm drop-shadow-md">Username</span>
+                        <span id="story-time" class="text-xs text-white/60 drop-shadow-md">5m ago</span>
+                    </div>
+                    <button onclick="closeStoriesModal()" class="text-white text-xl p-1.5 hover:bg-white/10 rounded-full transition-colors flex items-center justify-center size-8 z-20 bg-transparent border-none cursor-pointer">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <div class="absolute inset-0 z-0 bg-black flex justify-center items-center">
+                    <img id="story-image-content" class="w-full h-full object-cover" />
+                </div>
+
+                <div class="z-10 flex justify-center items-center mb-2 w-full">
+                    <input type="text" placeholder="Send a reply..." class="w-full bg-white/25 border border-white/20 placeholder-white/70 text-white rounded-full px-4 py-2 text-xs backdrop-blur-sm focus:outline-none focus:bg-white/35 transition-all">
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{% static 'index.js' %}"></script>
+</body>
+
+</html>
+<!-- add snap sending option from users chat to that user as well as to all his friends and add some more friends   -->

@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block main %}
+<div class="dock absolute px-4 gap-4 justify-between top-0 shadow-xs dock-lg">
+    <div class="max-w-[20px]">
+        <a href="{% url 'home' %}" class="cursor-pointer">
+            <i class="fa-solid fa-chevron-down"></i>
+        </a>
+    </div>
+    <form novalidate action="{% url 'search-users' %}" method="get" class="max-w-[500px] w-full">
+        <label class="outline-none flex flex-row h-10 input border-none rounded-full bg-stone-100">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input name="username" type="search" required placeholder="Search" class="pl-2" />
+        </label>
+    </form>
+</div>
+
+<main class="mt-24 px-4">
+    {% if not search and suggested_users %}
+    <div class="mb-6">
+        <h2 class="text-sm font-semibold text-gray-700 mb-3">Suggested friends</h2>
+        <ul class="space-y-3">
+            {% for user in suggested_users %}
+            <li class="flex items-center justify-between">
+                <div class="flex flex-row gap-4">
+                    <div class="avatar">
+                        <div class="ring-purple-600 w-10 h-10 rounded-full ring-2 ring-offset-2 overflow-hidden">
+                            <img src="{% if user.avatar %}{{ user.avatar.url }}{% else %}/static/snaps/default.jpg{% endif %}" class="w-full h-full object-cover" />
+                        </div>
+                    </div>
+                    <div>
+                        <h2>{{ user.username }}</h2>
+                        <p class="text-xs text-gray-400">Add as a friend</p>
+                    </div>
+                </div>
+                <form action="{% url 'send-invite' user.id %}" method="post">
+                    {% csrf_token %}
+                    <button type="submit"
+                        class="btn btn-sm border-none outline-none rounded-full bg-yellow-300 text-gray-800">
+                        <i class="fa-solid fa-user-plus"></i>
+                        Add
+                    </button>
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <ul class="space-y-6">
+        {% for user in users %}
+        <li class="flex items-center justify-between">
+            <div class="flex flex-row gap-4">
+                <div class="avatar">
+                    <div class="ring-purple-600 w-10 h-10 rounded-full ring-2 ring-offset-2 overflow-hidden">
+                        <img src="{% if user.avatar %}{{ user.avatar.url }}{% else %}/static/snaps/default.jpg{% endif %}"
+                            class="w-full h-full object-cover" />
+                    </div>
+                </div>
+                <div>
+                    <h2>{{ user.username }}</h2>
+                    <p class="flex flex-row items-center gap-1">
+                        <span class="text-xs text-gray-400">{{ user.username }}</span>
+                    </p>
+                </div>
+            </div>
+            <div>
+                {% if user.id in pending %}
+                <button class="btn btn-sm border-none outline-none rounded-full bg-yellow-300 text-gray-800">
+                    <i class="fa-solid fa-clock"></i>
+                    Pending
+                </button>
+                {% elif user.id not in friends %}
+                <form action="{% url 'send-invite' user.id %}" method="post">
+                    {% csrf_token %}
+                    <button type="submit"
+                        class="btn btn-sm border-none outline-none rounded-full bg-yellow-300 text-gray-800">
+                        <i class="fa-solid fa-user-plus"></i>
+                        Add
+                    </button>
+                </form>
+                {% else %}
+                {% endif %}
+            </div>
+        </li>
+        {% empty %}
+        <p class="text-gray-400 text-xs text-center">No search results found </p>
+        {% endfor %}
+    </ul>
+</main>
+{% endblock %}

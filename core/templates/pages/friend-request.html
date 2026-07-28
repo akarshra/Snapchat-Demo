@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block main %}
+<div class="dock absolute px-4 gap-4 top-0 justify-start shadow-xs dock-lg">
+    <div class="max-w-[20px]">
+        <a href="{% url 'home' %}" class="cursor-pointer">
+            <i class="fa-solid fa-chevron-down"></i>
+        </a>
+    </div>
+    <h1 class="max-w-full flex flex-row text-xl font-semibold">Friends Requests</h1>
+</div>
+
+<main class="mt-24 px-4">
+    <ul class="space-y-6">
+        {% for friend_request in friend_requests %}
+        <li class="flex items-center justify-between">
+            <div class="flex flex-row gap-4">
+                <div class="avatar">
+                    <div class="ring-purple-600 w-10 h-10 rounded-full ring-2 ring-offset-2">
+                        <img src="{{ friend_request.from_user.avatar.url }}" class="object-cover" />
+                    </div>
+                </div>
+                <div>
+                    <h2>{{ friend_request.from_user.username }}</h2>
+                    <p class="flex flex-row items-center gap-1">
+                        <span class="text-xs text-gray-400">{{ friend_request.from_user.username }}</span>
+                    </p>
+                </div>
+            </div>
+
+            <form action="{% url 'accept-friend' friend_request.id %}" method="post">
+                {% csrf_token %}
+                <button type="submit"
+                    class="btn btn-sm border-none outline-none rounded-full bg-yellow-300 text-gray-800">
+                    <i class="fa-solid fa-user-plus"></i>
+                    Accept
+                </button>
+            </form>
+
+        </li>
+        {% empty %}
+        <p class="text-gray-400 text-xs text-center">No pending requests :)</p>
+        {% endfor %}
+    </ul>
+</main>
+{% endblock %}

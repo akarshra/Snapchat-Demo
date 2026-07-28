@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block main %}
+<div class="dock shadow-xs px-4 absolute top-0 flex justify-between dock-lg">
+    <div class="flex flex-row gap-3 justify-start items-center">
+        
+        <div class="dropdown z-[2000]">
+            <div tabindex="0" role="button" class="size-[32px] flex justify-center items-center rounded-full bg-gray-100 cursor-pointer overflow-hidden hover:bg-gray-200 transition-colors">
+                {% if request.user.avatar %}
+                    <img src="{{ request.user.avatar.url }}" class="w-full h-full object-cover" />
+                {% else %}
+                    <i class="fa-solid fa-user text-yellow-500"></i>
+                {% endif %}
+            </div>
+            <ul tabindex="0" class="dropdown-content menu bg-white text-gray-850 rounded-box w-52 p-2 shadow-lg border border-gray-100 mt-2">
+                <li class="menu-title px-4 py-2 border-b border-gray-100">
+                    <span class="font-bold text-gray-800 text-sm block">{{ request.user.username }}</span>
+                    <span class="text-xs text-gray-400 font-normal">@{{ request.user.username }}</span>
+                </li>
+                <li><a href="{% url 'friend-requests' %}" class="flex gap-2 items-center py-2 text-sm text-gray-700 hover:bg-gray-50"><i class="fa-solid fa-user-plus text-yellow-500"></i> Friend Requests</a></li>
+                <li><a href="{% url 'search-users' %}" class="flex gap-2 items-center py-2 text-sm text-gray-700 hover:bg-gray-50"><i class="fa-solid fa-magnifying-glass text-blue-500"></i> Search Friends</a></li>
+                <li><a href="{% url 'logout' %}" class="flex gap-2 items-center py-2 text-sm text-red-500 hover:bg-red-50"><i class="fa-solid fa-arrow-right-from-bracket"></i> Log Out</a></li>
+            </ul>
+        </div>
+        <a href="{% url 'search-users' %}"
+            class="size-[32px] flex justify-center items-center rounded-full bg-gray-100 p-2">
+            <i class="fa-solid fa-magnifying-glass"></i>
+        </a>
+    </div>
+    <h1 class="text-xl font-semibold">Chat</h1>
+    <div class="flex flex-row gap-3 justify-end items-center">
+        
+        <a href="{% url 'notifications' %}"
+            class="relative size-[32px] flex justify-center items-center rounded-full bg-gray-100 p-2 hover:bg-gray-200 transition-colors">
+            <i class="fa-regular fa-bell"></i>
+            {% if notifications_count > 0 %}
+                <span class="absolute top-0.5 right-0.5 size-2 bg-red-500 rounded-full ring-2 ring-white"></span>
+            {% endif %}
+        </a>
+        <a href="{% url 'friend-requests' %}"
+            class="size-[32px] bg-yellow-300 flex justify-center items-center rounded-full p-2">
+            <i class="fa-solid fa-user-plus"></i>
+        </a>
+
+        <div class="dropdown dropdown-end z-[2000]">
+            <div tabindex="0" role="button" class="size-[32px] flex justify-center items-center rounded-full bg-gray-100 p-2 cursor-pointer hover:bg-gray-200 transition-colors">
+                <i class="fa-solid fa-ellipsis fa-lg"></i>
+            </div>
+            <ul tabindex="0" class="dropdown-content menu bg-white text-gray-850 rounded-box w-52 p-2 shadow-lg border border-gray-100 mt-2">
+                <li><a href="{% url 'friend-requests' %}" class="flex gap-2 items-center py-2 text-sm text-gray-700 hover:bg-gray-50"><i class="fa-solid fa-bell"></i> Manage Requests</a></li>
+                <li><a href="{% url 'search-users' %}" class="flex gap-2 items-center py-2 text-sm text-gray-700 hover:bg-gray-50"><i class="fa-solid fa-user-plus"></i> Add Friends</a></li>
+                <li><a href="{% url 'logout' %}" class="flex gap-2 items-center py-2 text-sm text-red-500 hover:bg-red-50"><i class="fa-solid fa-arrow-right-from-bracket"></i> Log Out</a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+<main class="mt-24 px-4 overflow-y-auto" style="height: calc(100% - 160px);">
+    <div class="space-y-4">
+        {% for friend in friends %}
+        <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded-xl transition-all duration-200">
+            <a href="{% url 'chat-details' friend.id  %}" class="flex flex-row gap-4 grow">
+                <div class="avatar">
+                    <div class="ring-purple-600 w-10 h-10 rounded-full ring-2 ring-offset-2 overflow-hidden">
+                        <img src="{{ friend.avatar.url }}" class="w-full h-full object-cover" />
+                    </div>
+                </div>
+                <div>
+                    <h2 class="font-semibold text-gray-850">{{ friend.username }}</h2>
+                    <p class="flex flex-row items-center gap-1">
+                        <i class="fa-regular fa-message fa-xs text-blue-500"></i>
+                        <span class="text-xs text-gray-400">Received</span>
+                        <span class="size-1 rounded-full bg-gray-300"></span>
+                        <span class="text-xs text-gray-400">1m</span>
+                    </p>
+                </div>
+            </a>
+            <a href="{% url 'chat-details' friend.id %}?open=camera" class="p-2.5 hover:bg-gray-200 rounded-full transition-colors flex items-center justify-center">
+                <i class="fa-solid fa-camera fa-lg text-gray-500 hover:text-black"></i>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+</main>
+{% include 'components/bottom-navbar.html' %}
+{% endblock %}

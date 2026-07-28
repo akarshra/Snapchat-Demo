@@ -1,0 +1,207 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<style>
+    #map {
+        width: 100%;
+        height: 100%;
+        background-color: #e5e7eb;
+        overflow: hidden;
+    }
+    .leaflet-popup-content-wrapper {
+        border-radius: 12px !important;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+        font-family: "Public Sans", sans-serif;
+    }
+    .leaflet-popup-content {
+        margin: 8px 12px !important;
+    }
+    .custom-avatar-marker {
+        background: none;
+        border: none;
+    }
+</style>
+{% endblock %}
+
+{% block main %}
+<div id="map" class="absolute inset-0 rounded-t-lg sm:rounded-lg overflow-hidden"></div>
+
+<button id="locate-btn" class="absolute bottom-24 right-4 z-[1001] bg-white text-black size-12 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-100 transition-all border border-gray-200" title="Locate Me">
+    <i class="fa-solid fa-location-crosshairs text-xl text-blue-500"></i>
+</button>
+
+<div id="location-alert" class="absolute bottom-24 left-4 right-4 bg-black/85 text-white text-xs px-4 py-3 rounded-xl shadow-lg flex items-center justify-between transition-all duration-300 transform translate-y-24 opacity-0" style="z-index: 1001;">
+    <div class="flex items-center gap-2 pr-2">
+        <i class="fa-solid fa-circle-exclamation text-yellow-400 text-sm"></i>
+        <span id="alert-text">Using default location. Enable location access.</span>
+    </div>
+    <button onclick="dismissAlert()" class="text-white/60 hover:text-white font-bold bg-transparent border-none outline-none cursor-pointer text-xs pl-2">Dismiss</button>
+</div>
+
+{% include 'components/bottom-navbar.html' %}
+
+{{ friends_json|json_script:"friends-data" }}
+
+<script>
+    const friends = JSON.parse(document.getElementById('friends-data').textContent);
+    const baseLat = parseFloat("{{ base_lat }}");
+    const baseLng = parseFloat("{{ base_lng }}");
+
+    const map = L.map('map', {
+        zoomControl: false,
+        attributionControl: false
+    }).setView([baseLat, baseLng], 13);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19
+    }).addTo(map);
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    function createAvatarIcon(avatarUrl, username, isSelf) {
+        const ringColor = isSelf ? 'border-yellow-400 ring-yellow-300' : 'border-purple-600 ring-purple-400';
+        const labelBg = isSelf ? 'bg-yellow-400 text-black' : 'bg-black/85 text-white';
+        
+        const htmlContent = `
+            <div class="flex flex-col items-center">
+                <div class="relative w-10 h-10 rounded-full border-2 overflow-hidden shadow-md bg-white ${ringColor} ring-2 ring-offset-1 transform transition hover:scale-110 duration-200">
+                    <img src="${avatarUrl}" class="w-full h-full object-cover rounded-full" />
+                </div>
+                <div class="w-2.5 h-2.5 bg-yellow-400 rounded-full shadow-sm -mt-0.5 border border-white"></div>
+                <div class="${labelBg} text-[10px] px-2 py-0.5 rounded-full font-bold mt-1.5 shadow-sm border border-white/10 whitespace-nowrap max-w-[85px] truncate flex items-center justify-center gap-0.5">
+                    📍 ${username}
+                </div>
+            </div>
+        `;
+        return L.divIcon({
+            html: htmlContent,
+            className: 'custom-avatar-marker',
+            iconSize: [44, 70],
+            iconAnchor: [22, 40]
+        });
+    }
+
+    let markers = {};
+    let userMarker = null;
+
+    function renderMapMarkers() {
+       
+        for (const id in markers) {
+            map.removeLayer(markers[id]);
+        }
+        markers = {};
+
+        friends.forEach(f => {
+            if (f.lat !== null && f.lng !== null) {
+                const icon = createAvatarIcon(f.avatar_url, f.username, f.is_self);
+                const marker = L.marker([f.lat, f.lng], { icon: icon }).addTo(map);
+                
+                
+                let popupContent = `
+                    <div class="text-center py-1 px-2">
+                        <p class="font-bold text-gray-800 text-sm mb-1">${f.username}</p>
+                `;
+                if (f.is_self) {
+                    popupContent += `<span class="text-xs text-yellow-600 font-bold">This is you</span>`;
+                } else {
+                    popupContent += `<a href="/chat-details/${f.id}" class="inline-block bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold px-3 py-1 rounded-full mt-2 no-underline shadow-sm transition-all">Chat</a>`;
+                }
+                popupContent += `</div>`;
+                
+                marker.bindPopup(popupContent);
+                markers[f.id] = marker;
+
+                if (f.is_self) {
+                    userMarker = marker;
+                }
+            }
+        });
+    }
+
+    function fetchLocation() {
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+
+                    const selfUser = friends.find(f => f.is_self);
+                    if (selfUser) {
+                        selfUser.lat = lat;
+                        selfUser.lng = lng;
+                    }
+
+                    map.setView([lat, lng], 13);
+                    
+                    renderMapMarkers();
+
+                    fetch("{% url 'update-location' %}", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRFToken": csrftoken
+                        },
+                        body: JSON.stringify({ latitude: lat, longitude: lng })
+                    })
+                    .then(response => response.json())
+                    .then(data => console.log("Backend Location Updated:", data))
+                    .catch(err => console.error("Error updating location:", err));
+                },
+                (error) => {
+                    console.warn("Geolocation permission error:", error);
+                    showAlert("Location permission denied. Using default location.");
+                    renderMapMarkers();
+                },
+                { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+            );
+        } else {
+            showAlert("Geolocation not supported by this browser.");
+            renderMapMarkers();
+        }
+    }
+
+    fetchLocation();
+
+    const locateBtn = document.getElementById("locate-btn");
+    if (locateBtn) {
+        locateBtn.addEventListener("click", () => {
+            if (userMarker) {
+                map.setView(userMarker.getLatLng(), 14);
+                userMarker.openPopup();
+            } else {
+                fetchLocation();
+            }
+        });
+    }
+
+    function showAlert(msg) {
+        const alertDiv = document.getElementById("location-alert");
+        document.getElementById("alert-text").innerText = msg;
+        alertDiv.classList.remove("translate-y-24", "opacity-0");
+        alertDiv.classList.add("translate-y-0", "opacity-100");
+    }
+
+    function dismissAlert() {
+        const alertDiv = document.getElementById("location-alert");
+        alertDiv.classList.remove("translate-y-0", "opacity-100");
+        alertDiv.classList.add("translate-y-24", "opacity-0");
+    }
+</script>
+{% endblock %}
