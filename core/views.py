@@ -340,9 +340,13 @@ def send_message(request, id):
         recipients = get_message_recipients(request.user, friend, target)
         
         # Get channel layer for real-time WebSocket broadcast
-        from asgiref.sync import async_to_sync
-        from channels.layers import get_channel_layer
-        channel_layer = get_channel_layer()
+        channel_layer = None
+        try:
+            from asgiref.sync import async_to_sync
+            from channels.layers import get_channel_layer
+            channel_layer = get_channel_layer()
+        except ImportError:
+            pass
         
         for recipient in recipients:
             chat = get_or_create_chat(request.user, recipient)
@@ -554,9 +558,13 @@ def toggle_ghost_mode(request):
 def trigger_screenshot_notification(request, id):
     friend = get_object_or_404(get_user_model(), pk=id)
     
-    from asgiref.sync import async_to_sync
-    from channels.layers import get_channel_layer
-    channel_layer = get_channel_layer()
+    channel_layer = None
+    try:
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+        channel_layer = get_channel_layer()
+    except ImportError:
+        pass
     if channel_layer:
         room_name = f"chat_{min(request.user.id, friend.id)}_{max(request.user.id, friend.id)}"
         room_group_name = f"chat_{room_name}"
