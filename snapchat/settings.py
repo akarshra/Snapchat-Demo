@@ -155,6 +155,8 @@ LOGIN_URL = "/login/"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
+
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels.layers.InMemoryChannelLayer",
