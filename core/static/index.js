@@ -872,7 +872,7 @@ function appendMessage(message, currentUserId) {
     } else if (message.image_url) {
       contentHtml = `
         <div class="chat-bubble p-0 max-w-24 aspect-3/4 rounded-lg overflow-hidden">
-            <img src="${message.image_url}" class="w-full h-full object-cover">
+            <img src="${message.image_url}" class="w-full h-full object-cover" onload="scrollChatToBottom()">
         </div>
       `;
     }
@@ -888,9 +888,15 @@ function appendMessage(message, currentUserId) {
     container.appendChild(chatDiv);
   }
 
+  scrollChatToBottom();
+}
+
+function scrollChatToBottom() {
   const mainScroll = document.getElementById("chat-scroll-container");
   if (mainScroll) {
-    mainScroll.scrollTop = mainScroll.scrollHeight;
+    setTimeout(() => {
+      mainScroll.scrollTop = mainScroll.scrollHeight;
+    }, 50);
   }
 }
 
