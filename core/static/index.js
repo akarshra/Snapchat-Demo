@@ -526,6 +526,15 @@ document.addEventListener("DOMContentLoaded", () => {
       currentMsgIds.add(parseInt(el.dataset.messageId));
     });
 
+    // Remove deleted messages from the DOM (e.g. viewed or expired messages)
+    const apiMsgIds = new Set(messages.map(msg => msg.id));
+    msgElements.forEach(el => {
+      const id = parseInt(el.dataset.messageId);
+      if (!apiMsgIds.has(id)) {
+        el.remove();
+      }
+    });
+
     let newMsgAdded = false;
     messages.forEach(msg => {
       if (!currentMsgIds.has(msg.id)) {
