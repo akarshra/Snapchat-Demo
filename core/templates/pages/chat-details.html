@@ -1,34 +1,71 @@
 {% extends 'base.html' %}
 {% block main %}
 {% load humanize %}
-<div class="dock absolute gap-2 px-4 justify-start top-0 shadow-xs dock-lg">
-    <div class="max-w-[20px]">
-        <a href="{% url 'home' %}" class="cursor-pointer">
+<div class="absolute top-0 left-0 right-0 h-16 bg-white border-b border-gray-100 flex flex-row items-center justify-between px-4 z-[1001]">
+    <div class="flex items-center gap-3">
+        <a href="{% url 'home' %}" class="cursor-pointer text-gray-700 hover:text-black transition-colors p-1">
             <i class="fa-solid fa-chevron-left"></i>
         </a>
-    </div>
-    <div class="max-w-full w-full flex flex-row justify-start items-center gap-3">
         <div class="avatar">
-            <div class="w-10 h-10 rounded-full overflow-hidden">
+            <div class="w-10 h-10 rounded-full overflow-hidden border border-gray-200">
                 <img src="{% if friend.avatar %}{{ friend.avatar.url }}{% else %}/static/snaps/default.jpg{% endif %}" class="w-full h-full object-cover" />
             </div>
         </div>
-        <p class="font-semibold text-gray-800"> {{ friend.username }} </p>
+        <p class="font-semibold text-gray-800 text-sm"> {{ friend.username }} </p>
     </div>
-    <div class="flex flex-row justify-end gap-2 items-center">
-        <button onclick="startCall('voice')" class="btn btn-ghost btn-circle btn-sm hover:bg-gray-100 flex items-center justify-center" title="Voice Call">
+    <div class="flex flex-row gap-3 items-center">
+        <button onclick="startCall('voice')" class="btn btn-ghost btn-circle btn-sm hover:bg-gray-100 flex items-center justify-center cursor-pointer" title="Voice Call">
             <i class="fa-solid fa-lg fa-phone text-gray-700"></i>
         </button>
-        <button onclick="startCall('video')" class="btn btn-ghost btn-circle btn-sm hover:bg-gray-100 flex items-center justify-center" title="Video Call">
+        <button onclick="startCall('video')" class="btn btn-ghost btn-circle btn-sm hover:bg-gray-100 flex items-center justify-center cursor-pointer" title="Video Call">
             <i class="fa-solid fa-lg fa-video text-gray-700"></i>
         </button>
+        <div class="dropdown dropdown-end z-[1002]">
+            <button tabindex="0" type="button" class="btn btn-ghost btn-circle btn-sm hover:bg-gray-100 flex items-center justify-center cursor-pointer" title="Chat Settings">
+                <i class="fa-solid fa-lg fa-ellipsis-vertical text-gray-700"></i>
+            </button>
+            <ul tabindex="0" class="dropdown-content menu bg-white text-gray-800 rounded-box w-52 p-2 shadow-lg border border-gray-200 mt-1">
+                <li class="menu-title text-xs font-semibold text-gray-500">Delete Messages</li>
+                <li>
+                    <label class="flex justify-between items-center py-2 px-3 cursor-pointer hover:bg-gray-100 rounded-lg">
+                        <span class="text-xs">After Viewing</span>
+                        <input type="radio" name="delete_option" value="on_close" class="radio radio-xs radio-primary" {% if chat.model == 'on_close' %}checked{% endif %}>
+                    </label>
+                </li>
+                <li>
+                    <label class="flex justify-between items-center py-2 px-3 cursor-pointer hover:bg-gray-100 rounded-lg">
+                        <span class="text-xs">24 Hours after Sending</span>
+                        <input type="radio" name="delete_option" value="after_24hr" class="radio radio-xs radio-primary" {% if chat.model == 'after_24hr' %}checked{% endif %}>
+                    </label>
+                </li>
+                <li>
+                    <label class="flex justify-between items-center py-2 px-3 cursor-pointer hover:bg-gray-100 rounded-lg">
+                        <span class="text-xs">Keep Messages</span>
+                        <input type="radio" name="delete_option" value="keep" class="radio radio-xs radio-primary" {% if chat.model == 'keep' %}checked{% endif %}>
+                    </label>
+                </li>
+                <li class="menu-title text-xs font-semibold text-gray-500 border-t border-gray-100 mt-2 pt-2">Streak Settings</li>
+                <li>
+                    <label class="flex justify-between items-center py-2 px-3 cursor-pointer hover:bg-gray-100 rounded-lg">
+                        <span class="text-xs font-medium">Show Streak 🔥</span>
+                        <input type="checkbox" name="show_streak" class="toggle toggle-xs toggle-primary checkbox checkbox-xs checkbox-primary" {% if chat.show_streak %}checked{% endif %}>
+                    </label>
+                </li>
+            </ul>
+        </div>
     </div>
 </div>
 
-<main class="left-0 right-0 top-[80px] bottom-[80px] absolute overflow-y-auto">
-    <div class="min-h-full flex flex-col justify-end px-4">
+<main id="chat-scroll-container" class="left-0 right-0 top-[64px] bottom-[64px] absolute overflow-y-auto">
+    <div id="chat-messages-container" class="min-h-full flex flex-col justify-end px-4">
         {% for message in chat_messages %}
-        {% if message.sender == request.user %}
+        {% if message.is_system %}
+        <div class="flex justify-center my-2">
+            <span class="text-[10px] bg-gray-100 text-gray-500 px-3 py-1 rounded-full font-semibold border border-gray-200/50">
+                {{ message.text }}
+            </span>
+        </div>
+        {% elif message.sender == request.user %}
         <div class="chat chat-end">
             <div class="chat-header">
                 {{ message.sender }}
@@ -61,9 +98,9 @@
     </div>
 </main>
 <div id="preview-dock"
-    class="dock bg-base-200  absolute gap-2 px-4 justify-start bottom-[72px] shadow-xs dock-lg hidden">
+    class="absolute left-0 right-0 bg-gray-50 border-t border-gray-100 gap-2 px-4 py-3 bottom-[64px] shadow-sm z-[1001] hidden">
 
-    <div class="flex flex-row justify-start gap-4 max-w-full">
+    <div class="flex flex-row justify-start gap-4 max-w-full items-center">
         <div id="preview-container" class="w-12 h-12 rounded-md overflow-hidden">
         </div>
         <div class="grow flex justify-between items-center flex-row">
@@ -74,23 +111,20 @@
         </div>
     </div>
 </div>
-<div class="dock absolute gap-2 px-4 justify-start bottom-0 shadow-xs dock-lg">
-    <button id="file-button" type="button" class="max-w-10 rounded-full btn btn-square text-white bg-black" title="Open camera">
+<div class="absolute bottom-0 left-0 right-0 h-16 bg-white border-t border-gray-100 flex flex-row items-center gap-2 px-4 z-[1001]">
+    <button id="file-button" type="button" class="w-10 h-10 rounded-full flex items-center justify-center text-white bg-black hover:bg-neutral transition-colors flex-shrink-0 cursor-pointer" title="Open camera">
         <i class="fa-solid fa-camera"></i>
     </button>
-    <button id="upload-photo-button" type="button" class="max-w-10 rounded-full btn btn-square text-white bg-gray-700" title="Upload photo from device">
+    <button id="upload-photo-button" type="button" class="w-10 h-10 rounded-full flex items-center justify-center text-white bg-gray-700 hover:bg-gray-800 transition-colors flex-shrink-0 cursor-pointer" title="Upload photo from device">
         <i class="fa-solid fa-image"></i>
     </button>
-    <form action="{% url 'send-message' friend.id %}" method="post" enctype="multipart/form-data"
-        class="max-w-full flex flex-row gap-2 items-center">
+    <form id="chat-form" action="{% url 'send-message' friend.id %}" method="post" enctype="multipart/form-data"
+        class="grow flex flex-row gap-2 items-center min-w-0 m-0">
         {% csrf_token %}
         <input id="snap-file" name="image" type="file" class="hidden">
-        <input name="message" type="text" class="rounded-full input input-border" placeholder="Send chat">
-        <button type="submit" name="target" value="chat" class="rounded-full btn btn-square text-white bg-blue-500">
+        <input name="message" type="text" class="grow min-w-0 bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-full py-2.5 px-4 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:bg-white transition-all" placeholder="Send chat">
+        <button type="submit" name="target" value="chat" class="w-10 h-10 rounded-full flex items-center justify-center text-white bg-blue-500 hover:bg-blue-600 transition-colors flex-shrink-0 cursor-pointer">
             <i class="fa-solid fa-arrow-up"></i>
-        </button>
-        <button type="submit" name="target" value="all_friends" class="rounded-full btn btn-sm text-gray-700 bg-yellow-300 border-none">
-            <i class="fa-solid fa-users"></i>
         </button>
     </form>
 </div>
@@ -121,4 +155,7 @@
     </div>
 </div>
 <div id="camera-context" class="hidden" data-chat-user-id="{{ friend.id }}" data-chat-username="{{ friend.username }}"></div>
+<div id="chat-context" class="hidden" data-friend-id="{{ friend.id }}" data-current-user-id="{{ request.user.id }}" data-current-user-username="{{ request.user.username }}"></div>
+
+
 {% endblock %}

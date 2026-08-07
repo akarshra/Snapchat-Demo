@@ -29,6 +29,20 @@
 {% block main %}
 <div id="map" class="absolute inset-0 rounded-t-lg sm:rounded-lg overflow-hidden"></div>
 
+<!-- Ghost Mode Floating Card -->
+<div class="absolute top-4 left-4 right-4 z-[1001] bg-white/90 backdrop-blur-md rounded-2xl shadow-lg border border-gray-150 p-3 flex justify-between items-center">
+    <div class="flex items-center gap-3">
+        <div class="size-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600">
+            <i class="fa-solid fa-ghost text-sm animate-pulse"></i>
+        </div>
+        <div>
+            <p class="text-xs font-bold text-gray-800">Ghost Mode</p>
+            <p class="text-[9px] text-gray-400">Hide your real-time location from friends</p>
+        </div>
+    </div>
+    <input type="checkbox" id="ghost-mode-toggle" class="toggle toggle-sm toggle-primary toggle-ghost checkbox checkbox-sm checkbox-primary" {% if request.user.ghost_mode %}checked{% endif %}>
+</div>
+
 <button id="locate-btn" class="absolute bottom-24 right-4 z-[1001] bg-white text-black size-12 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-100 transition-all border border-gray-200" title="Locate Me">
     <i class="fa-solid fa-location-crosshairs text-xl text-blue-500"></i>
 </button>
@@ -202,6 +216,32 @@
         const alertDiv = document.getElementById("location-alert");
         alertDiv.classList.remove("translate-y-0", "opacity-100");
         alertDiv.classList.add("translate-y-24", "opacity-0");
+    }
+
+    // Ghost Mode toggle listener
+    const ghostToggle = document.getElementById("ghost-mode-toggle");
+    if (ghostToggle) {
+        ghostToggle.addEventListener("change", function() {
+            const isGhost = this.checked;
+            fetch("{% url 'toggle-ghost-mode' %}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrftoken
+                },
+                body: JSON.stringify({ ghost_mode: isGhost })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === "success") {
+                    console.log("Ghost mode updated:", data.ghost_mode);
+                    window.location.reload();
+                } else {
+                    console.error("Failed to toggle ghost mode");
+                }
+            })
+            .catch(err => console.error("Error toggling ghost mode:", err));
+        });
     }
 </script>
 {% endblock %}

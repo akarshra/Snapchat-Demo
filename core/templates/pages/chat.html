@@ -1,16 +1,16 @@
 {% extends 'base.html' %}
 {% block main %}
-<div class="dock shadow-xs px-4 absolute top-0 flex justify-between dock-lg">
+<div class="absolute top-0 left-0 right-0 h-16 bg-white border-b border-gray-100 flex flex-row items-center justify-between px-4 z-[1001]">
     <div class="flex flex-row gap-3 justify-start items-center">
         
-        <div class="dropdown z-[2000]">
-            <div tabindex="0" role="button" class="size-[32px] flex justify-center items-center rounded-full bg-gray-100 cursor-pointer overflow-hidden hover:bg-gray-200 transition-colors">
+        <div class="dropdown z-[2002]">
+            <button tabindex="0" type="button" class="size-[32px] flex justify-center items-center rounded-full bg-gray-100 cursor-pointer overflow-hidden hover:bg-gray-200 transition-colors border-none p-0">
                 {% if request.user.avatar %}
                     <img src="{{ request.user.avatar.url }}" class="w-full h-full object-cover" />
                 {% else %}
                     <i class="fa-solid fa-user text-yellow-500"></i>
                 {% endif %}
-            </div>
+            </button>
             <ul tabindex="0" class="dropdown-content menu bg-white text-gray-850 rounded-box w-52 p-2 shadow-lg border border-gray-100 mt-2">
                 <li class="menu-title px-4 py-2 border-b border-gray-100">
                     <span class="font-bold text-gray-800 text-sm block">{{ request.user.username }}</span>
@@ -22,11 +22,11 @@
             </ul>
         </div>
         <a href="{% url 'search-users' %}"
-            class="size-[32px] flex justify-center items-center rounded-full bg-gray-100 p-2">
+            class="size-[32px] flex justify-center items-center rounded-full bg-gray-100 p-2 hover:bg-gray-200 transition-colors">
             <i class="fa-solid fa-magnifying-glass"></i>
         </a>
     </div>
-    <h1 class="text-xl font-semibold">Chat</h1>
+    <h1 class="text-xl font-semibold text-gray-800">Chat</h1>
     <div class="flex flex-row gap-3 justify-end items-center">
         
         <a href="{% url 'notifications' %}"
@@ -37,14 +37,14 @@
             {% endif %}
         </a>
         <a href="{% url 'friend-requests' %}"
-            class="size-[32px] bg-yellow-300 flex justify-center items-center rounded-full p-2">
-            <i class="fa-solid fa-user-plus"></i>
+            class="size-[32px] bg-yellow-300 flex justify-center items-center rounded-full p-2 hover:bg-yellow-400 transition-colors">
+            <i class="fa-solid fa-user-plus text-gray-800"></i>
         </a>
 
-        <div class="dropdown dropdown-end z-[2000]">
-            <div tabindex="0" role="button" class="size-[32px] flex justify-center items-center rounded-full bg-gray-100 p-2 cursor-pointer hover:bg-gray-200 transition-colors">
-                <i class="fa-solid fa-ellipsis fa-lg"></i>
-            </div>
+        <div class="dropdown dropdown-end z-[2002]">
+            <button tabindex="0" type="button" class="size-[32px] flex justify-center items-center rounded-full bg-gray-100 p-2 cursor-pointer hover:bg-gray-200 transition-colors border-none">
+                <i class="fa-solid fa-ellipsis fa-lg text-gray-700"></i>
+            </button>
             <ul tabindex="0" class="dropdown-content menu bg-white text-gray-850 rounded-box w-52 p-2 shadow-lg border border-gray-100 mt-2">
                 <li><a href="{% url 'friend-requests' %}" class="flex gap-2 items-center py-2 text-sm text-gray-700 hover:bg-gray-50"><i class="fa-solid fa-bell"></i> Manage Requests</a></li>
                 <li><a href="{% url 'search-users' %}" class="flex gap-2 items-center py-2 text-sm text-gray-700 hover:bg-gray-50"><i class="fa-solid fa-user-plus"></i> Add Friends</a></li>
@@ -53,29 +53,53 @@
         </div>
     </div>
 </div>
-<main class="mt-24 px-4 overflow-y-auto" style="height: calc(100% - 160px);">
-    <div class="space-y-4">
+<div id="notifications-context" data-current-user-id="{{ request.user.id }}" class="hidden"></div>
+
+<main class="absolute left-0 right-0 top-[64px] bottom-[64px] px-4 overflow-y-auto">
+    <div id="chat-list-container" class="space-y-4">
         {% for friend in friends %}
-        <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded-xl transition-all duration-200">
+        <div id="friend-row-{{ friend.id }}" data-friend-id="{{ friend.id }}" class="friend-row flex items-center justify-between p-2 hover:bg-gray-50 rounded-xl transition-all duration-200">
             <a href="{% url 'chat-details' friend.id  %}" class="flex flex-row gap-4 grow">
                 <div class="avatar">
-                    <div class="ring-purple-600 w-10 h-10 rounded-full ring-2 ring-offset-2 overflow-hidden">
-                        <img src="{{ friend.avatar.url }}" class="w-full h-full object-cover" />
+                    <div class="ring-purple-600 w-10 h-10 rounded-full ring-2 ring-offset-2 overflow-hidden flex items-center justify-center bg-gray-100">
+                        {% if friend.avatar %}
+                            <img src="{{ friend.avatar.url }}" class="w-full h-full object-cover" />
+                        {% else %}
+                            <i class="fa-solid fa-user text-purple-600"></i>
+                        {% endif %}
                     </div>
                 </div>
-                <div>
-                    <h2 class="font-semibold text-gray-850">{{ friend.username }}</h2>
-                    <p class="flex flex-row items-center gap-1">
-                        <i class="fa-regular fa-message fa-xs text-blue-500"></i>
-                        <span class="text-xs text-gray-400">Received</span>
-                        <span class="size-1 rounded-full bg-gray-300"></span>
-                        <span class="text-xs text-gray-400">1m</span>
+                <div class="grow min-w-0">
+                    <h2 class="font-semibold text-gray-850 flex items-center gap-1">
+                        {{ friend.username }}
+                        {% if friend.relationship_emoji %}
+                            <span class="text-sm" title="{{ friend.relationship_label }}">{{ friend.relationship_emoji }}</span>
+                        {% endif %}
+                        {% if friend.streak_active %}
+                            <span class="text-amber-550 font-bold text-sm flex items-center gap-0.5" title="Streak: {{ friend.streak_count }} days">
+                                🔥<span class="text-xs">{{ friend.streak_count }}</span>
+                            </span>
+                        {% endif %}
+                    </h2>
+                    <p class="flex flex-row items-center gap-1.5 whitespace-nowrap truncate text-xs text-gray-400">
+                        <i class="{{ friend.last_msg_icon }} fa-xs flex-shrink-0"></i>
+                        <span class="{% if friend.last_msg_bold %}text-red-500 font-bold{% else %}text-gray-400{% endif %} truncate">{{ friend.last_msg_status }}</span>
+                        {% if friend.last_msg %}
+                            <span class="size-1 rounded-full bg-gray-300 flex-shrink-0"></span>
+                            <span class="flex-shrink-0">{{ friend.last_msg.created_at | timesince }} ago</span>
+                        {% endif %}
                     </p>
                 </div>
             </a>
-            <a href="{% url 'chat-details' friend.id %}?open=camera" class="p-2.5 hover:bg-gray-200 rounded-full transition-colors flex items-center justify-center">
+            <button
+                type="button"
+                data-friend-id="{{ friend.id }}"
+                data-friend-name="{{ friend.username|escapejs }}"
+                onclick="openCameraForFriend(parseInt(this.dataset.friendId), this.dataset.friendName)"
+                class="p-2.5 hover:bg-gray-200 rounded-full transition-colors flex items-center justify-center bg-transparent border-none cursor-pointer"
+            >
                 <i class="fa-solid fa-camera fa-lg text-gray-500 hover:text-black"></i>
-            </a>
+            </button>
         </div>
         {% endfor %}
     </div>

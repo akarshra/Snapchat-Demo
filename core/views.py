@@ -65,16 +65,101 @@ def logout_view(request):
 
 @login_required
 def home(request):
+    # Get chats involving current user ordered by last active message
+    chats = Chat.objects.filter(
+        Q(user1=request.user) | Q(user2=request.user)
+    ).order_by('-last_message')
+
+    friends = []
+    friends_seen = set()
+
+    for chat in chats:
+        friend = chat.user2 if chat.user1 == request.user else chat.user1
+        if are_friends(request.user, friend):
+            if friend.id not in friends_seen:
+                friends.append(friend)
+                friends_seen.add(friend.id)
+
+    # Append any friends who do not have any chat history yet
     friend_requests = FriendRequest.objects.filter(
         status=FriendRequest.StatusChoice.ACCEPTED
     ).filter(Q(from_user=request.user) | Q(to_user=request.user))
+    for req in friend_requests:
+        friend = req.to_user if req.from_user == request.user else req.from_user
+        if friend.id not in friends_seen:
+            friends.append(friend)
+            friends_seen.add(friend.id)
 
-    friends = []
-    for friend in friend_requests:
-        if request.user == friend.from_user:
-            friends.append(friend.to_user)
+    from django.db.models import Count
+    sent_counts = {}
+    received_counts = {}
+    for friend in friends:
+        sent_counts[friend.id] = Message.objects.filter(sender=request.user, reciever=friend).count()
+        received_counts[friend.id] = Message.objects.filter(sender=friend, reciever=request.user).count()
+
+    u_best_friend_id = max(sent_counts, key=sent_counts.get) if any(sent_counts.values()) else None
+    sorted_sent = sorted(sent_counts.items(), key=lambda x: x[1], reverse=True)
+    top_3_ids = [fid for fid, count in sorted_sent[:3] if count > 0]
+
+    for friend in friends:
+        chat = get_or_create_chat(request.user, friend)
+        streak_count, streak_active = chat.get_streak()
+        friend.streak_count = streak_count
+        friend.streak_active = streak_active and chat.show_streak
+
+        emoji = ""
+        label = ""
+        f_best = Message.objects.filter(sender=friend).values('reciever_id').annotate(count=Count('id')).order_by('-count').first()
+        f_best_friend_id = f_best['reciever_id'] if f_best else None
+        total_exchanged = sent_counts[friend.id] + received_counts[friend.id]
+
+        if u_best_friend_id == friend.id and f_best_friend_id == request.user.id:
+            if total_exchanged > 100:
+                emoji = "💕"
+                label = "Super BFFs"
+            elif total_exchanged > 50:
+                emoji = "❤️"
+                label = "BFFs"
+            else:
+                emoji = "💛"
+                label = "Besties"
+        elif friend.id in top_3_ids:
+            emoji = "😊"
+            label = "Best Friends"
+
+        friend.relationship_emoji = emoji
+        friend.relationship_label = label
+
+        last_msg = Message.objects.filter(chat=chat).order_by('-created_at').first()
+        if last_msg:
+            friend.last_msg = last_msg
+            if last_msg.is_system:
+                friend.last_msg_status = last_msg.text
+                friend.last_msg_icon = "fa-solid fa-circle-info text-gray-400"
+                friend.last_msg_bold = False
+            elif last_msg.sender == request.user:
+                if last_msg.is_viewed:
+                    friend.last_msg_status = "Opened"
+                    friend.last_msg_icon = "fa-regular fa-paper-plane text-gray-400"
+                    friend.last_msg_bold = False
+                else:
+                    friend.last_msg_status = "Delivered"
+                    friend.last_msg_icon = "fa-solid fa-paper-plane text-blue-500"
+                    friend.last_msg_bold = False
+            else:
+                if last_msg.is_viewed:
+                    friend.last_msg_status = "Received"
+                    friend.last_msg_icon = "fa-regular fa-comment text-gray-400"
+                    friend.last_msg_bold = False
+                else:
+                    friend.last_msg_status = "New Snap" if last_msg.image else "New Message"
+                    friend.last_msg_icon = "fa-solid fa-comment text-red-500"
+                    friend.last_msg_bold = True
         else:
-            friends.append(friend.from_user)
+            friend.last_msg = None
+            friend.last_msg_status = "Tap to chat"
+            friend.last_msg_icon = "fa-regular fa-message text-gray-300"
+            friend.last_msg_bold = False
             
     pending_reqs = FriendRequest.objects.filter(
         status=FriendRequest.StatusChoice.PENDING, to_user=request.user
@@ -125,19 +210,31 @@ def chat_details_view(request, id):
     if not are_friends(request.user, friend):
         return redirect("home")
 
+    chat = get_or_create_chat(request.user, friend)
+
+    if chat.model == Chat.Model.AFTER_24HR:
+        from datetime import timedelta
+        cutoff = timezone.now() - timedelta(hours=24)
+        Message.objects.filter(chat=chat, created_at__lt=cutoff).delete()
+
+    # Mark incoming messages as viewed
+    Message.objects.filter(chat=chat, reciever=request.user, is_viewed=False).update(is_viewed=True)
+
     messages = Message.objects.filter(
         Q(sender=request.user, reciever=friend)
         | Q(sender=friend, reciever=request.user)
     ).order_by("created_at")
 
     messages = list(messages)
-    recieved_messages = Message.objects.filter(reciever=request.user, sender=friend)
-    recieved_messages.delete()
+
+    if chat.model == Chat.Model.ON_CLOSE:
+        recieved_messages = Message.objects.filter(reciever=request.user, sender=friend)
+        recieved_messages.delete()
 
     return render(
         request,
         "pages/chat-details.html",
-        {"friend": friend, "chat_messages": messages},
+        {"friend": friend, "chat_messages": messages, "chat": chat},
     )
 
 
@@ -228,6 +325,8 @@ def send_message(request, id):
     friend = get_object_or_404(get_user_model(), pk=id)
 
     if not are_friends(request.user, friend):
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"status": "error", "message": "Not friends"}, status=403)
         return redirect("home")
 
     message = request.POST.get("message") or ""
@@ -236,15 +335,64 @@ def send_message(request, id):
 
     if message or snap:
         recipients = get_message_recipients(request.user, friend, target)
+        
+        # Get channel layer for real-time WebSocket broadcast
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+        channel_layer = get_channel_layer()
+        
         for recipient in recipients:
             chat = get_or_create_chat(request.user, recipient)
-            Message.objects.create(
+            msg = Message.objects.create(
                 chat=chat,
                 sender=request.user,
                 reciever=recipient,
                 text=message,
                 image=snap,
             )
+            
+            # Update last message time
+            from django.utils import timezone
+            chat.last_message = timezone.now()
+            chat.save()
+            
+            if channel_layer:
+                room_name = f"chat_{min(request.user.id, recipient.id)}_{max(request.user.id, recipient.id)}"
+                room_group_name = f"chat_{room_name}"
+                async_to_sync(channel_layer.group_send)(
+                    room_group_name,
+                    {
+                        "type": "chat_message",
+                        "message": {
+                            "id": msg.id,
+                            "sender_id": request.user.id,
+                            "sender_username": request.user.username,
+                            "recipient_id": recipient.id,
+                            "text": msg.text,
+                            "image_url": msg.image.url if msg.image else None,
+                            "created_at": "Just now",
+                        }
+                    }
+                )
+
+                # Send real-time notification to the recipient on the home list page
+                recipient_notification_group = f"user_{recipient.id}_notifications"
+                async_to_sync(channel_layer.group_send)(
+                    recipient_notification_group,
+                    {
+                        "type": "send_notification",
+                        "notification": {
+                            "sender_id": request.user.id,
+                            "sender_username": request.user.username,
+                            "type": "image" if msg.image else "text",
+                            "text": "New Snap" if msg.image else "New Message",
+                            "created_at": "Just now",
+                        }
+                    }
+                )
+
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({"status": "success"})
     return redirect("chat-details", id=id)
 
 
@@ -298,6 +446,8 @@ def map_view(request):
     })
 
     for friend in friends:
+        if friend.ghost_mode:
+            continue
         lat = friend.latitude
         lng = friend.longitude
         
@@ -343,6 +493,81 @@ def update_location(request):
         return JsonResponse({"status": "success", "message": "Location updated."})
     except (ValueError, TypeError, json.JSONDecodeError):
         return JsonResponse({"status": "error", "message": "Invalid coordinates or request body."}, status=400)
+
+
+@login_required
+@require_http_methods(["POST"])
+def update_chat_delete_option(request, id):
+    try:
+        data = json.loads(request.body)
+        delete_option = data.get("delete_option")
+        if delete_option not in [Chat.Model.KEEP, Chat.Model.ON_CLOSE, Chat.Model.AFTER_24HR]:
+            return JsonResponse({"status": "error", "message": "Invalid option"}, status=400)
+        
+        friend = get_object_or_404(get_user_model(), pk=id)
+        chat = get_or_create_chat(request.user, friend)
+        chat.model = delete_option
+        chat.save()
+        
+        return JsonResponse({"status": "success", "message": "Delete option updated."})
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({"status": "error", "message": "Invalid request"}, status=400)
+
+
+@login_required
+@require_http_methods(["POST"])
+def update_chat_streak_option(request, id):
+    try:
+        data = json.loads(request.body)
+        show_streak = data.get("show_streak", True)
+        friend = get_object_or_404(get_user_model(), pk=id)
+        chat = get_or_create_chat(request.user, friend)
+        chat.show_streak = bool(show_streak)
+        chat.save()
+        
+        return JsonResponse({"status": "success", "message": "Streak option updated."})
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({"status": "error", "message": "Invalid request"}, status=400)
+
+
+@login_required
+@require_http_methods(["POST"])
+def toggle_ghost_mode(request):
+    try:
+        data = json.loads(request.body)
+        ghost_mode = data.get("ghost_mode", False)
+        user = request.user
+        user.ghost_mode = bool(ghost_mode)
+        user.save()
+        return JsonResponse({"status": "success", "ghost_mode": user.ghost_mode})
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({"status": "error", "message": "Invalid request"}, status=400)
+
+
+@login_required
+@require_http_methods(["POST"])
+def trigger_screenshot_notification(request, id):
+    friend = get_object_or_404(get_user_model(), pk=id)
+    
+    from asgiref.sync import async_to_sync
+    from channels.layers import get_channel_layer
+    channel_layer = get_channel_layer()
+    if channel_layer:
+        room_name = f"chat_{min(request.user.id, friend.id)}_{max(request.user.id, friend.id)}"
+        room_group_name = f"chat_{room_name}"
+        async_to_sync(channel_layer.group_send)(
+            room_group_name,
+            {
+                "type": "chat_message",
+                "message": {
+                    "is_screenshot_alert": True,
+                    "sender_username": request.user.username,
+                    "text": f"{request.user.username} took a screenshot!",
+                }
+            }
+        )
+        
+    return JsonResponse({"status": "success"})
 
 
 @login_required

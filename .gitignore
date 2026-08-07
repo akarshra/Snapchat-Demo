@@ -1,0 +1,12 @@
+*.pyc
+__pycache__/
+.venv/
+.env
+.DS_Store
+.gemini/
+*.pyc
+core/__pycache__/
+core/migrations/__pycache__/
+snapchat/__pycache__/
+media/snaps/
+core/static/snaps/
