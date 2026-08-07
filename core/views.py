@@ -634,3 +634,100 @@ def notifications_view(request):
             })
             
     return render(request, "pages/notifications.html", {"notifications": notifications})
+
+
+@login_required
+@require_http_methods(["GET"])
+def api_chat_messages(request, friend_id):
+    friend = get_object_or_404(get_user_model(), pk=friend_id)
+    chat = get_or_create_chat(request.user, friend)
+    
+    # Resolve session overrides if any
+    chat.model = request.session.get(f"chat_model_{chat.id}", chat.model)
+    
+    # Mark incoming messages as viewed if loading messages
+    Message.objects.filter(chat=chat, reciever=request.user, is_viewed=False).update(is_viewed=True)
+    
+    messages = Message.objects.filter(
+        Q(sender=request.user, reciever=friend)
+        | Q(sender=friend, reciever=request.user)
+    ).order_by("created_at")
+    
+    # Apply ON_CLOSE deletion logic
+    if chat.model == Chat.Model.ON_CLOSE:
+        Message.objects.filter(chat=chat, is_viewed=True).delete()
+        # Fetch remaining messages again
+        messages = Message.objects.filter(
+            Q(sender=request.user, reciever=friend)
+            | Q(sender=friend, reciever=request.user)
+        ).order_by("created_at")
+
+    from django.utils.timesince import timesince
+    
+    data = []
+    for msg in messages:
+        time_str = "Just now"
+        if timezone.now() - msg.created_at > timezone.timedelta(minutes=1):
+            time_str = f"{timesince(msg.created_at)} ago"
+            
+        data.append({
+            "id": msg.id,
+            "sender_id": msg.sender.id,
+            "sender_username": msg.sender.username,
+            "recipient_id": msg.reciever.id,
+            "text": msg.text,
+            "image_url": msg.image.url if msg.image else None,
+            "created_at": time_str,
+            "is_system": msg.is_system,
+        })
+        
+    return JsonResponse({"status": "success", "messages": data})
+
+
+@login_required
+@require_http_methods(["GET"])
+def api_unread_chats(request):
+    from django.db.models import Q
+    from core.models import FriendRequest
+    
+    friend_requests = FriendRequest.objects.filter(
+        status=FriendRequest.StatusChoice.ACCEPTED
+    ).filter(Q(from_user=request.user) | Q(to_user=request.user))
+    
+    friends = []
+    for fr in friend_requests:
+        other = fr.to_user if fr.from_user == request.user else fr.from_user
+        friends.append(other)
+        
+    data = []
+    from django.utils.timesince import timesince
+    for friend in friends:
+        chat = get_or_create_chat(request.user, friend)
+        last_msg = Message.objects.filter(chat=chat).order_by("-created_at").first()
+        
+        has_unviewed = False
+        last_text = ""
+        last_time = ""
+        last_type = "text"
+        
+        if last_msg:
+            last_text = last_msg.text
+            if timezone.now() - last_msg.created_at < timezone.timedelta(minutes=1):
+                last_time = "Just now"
+            else:
+                last_time = f"{timesince(last_msg.created_at)} ago"
+                
+            if last_msg.image:
+                last_type = "image"
+            if last_msg.sender == friend and not last_msg.is_viewed:
+                has_unviewed = True
+                
+        data.append({
+            "friend_id": friend.id,
+            "has_unviewed": has_unviewed,
+            "last_message_text": last_text,
+            "last_message_time": last_time,
+            "last_message_type": last_type,
+        })
+        
+    return JsonResponse({"status": "success", "chats": data})

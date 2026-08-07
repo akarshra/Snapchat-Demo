@@ -496,6 +496,52 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   let chatSocket = null;
+  let chatPollInterval = null;
+
+  function startChatPolling() {
+    if (chatPollInterval) return;
+    console.log("Fallback: Starting chat messages polling...");
+    pollChatMessages();
+    chatPollInterval = setInterval(pollChatMessages, 3000);
+  }
+
+  function pollChatMessages() {
+    fetch(`/api/chat-messages/${friendId}/`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === "success") {
+        updateChatMessages(data.messages);
+      }
+    })
+    .catch(err => console.error("Error polling chat messages:", err));
+  }
+
+  function updateChatMessages(messages) {
+    const container = document.getElementById("chat-messages-container");
+    if (!container) return;
+
+    const currentMsgIds = new Set();
+    const msgElements = container.querySelectorAll("[data-message-id]");
+    msgElements.forEach(el => {
+      currentMsgIds.add(parseInt(el.dataset.messageId));
+    });
+
+    let newMsgAdded = false;
+    messages.forEach(msg => {
+      if (!currentMsgIds.has(msg.id)) {
+        appendMessage(msg, currentUserId);
+        newMsgAdded = true;
+      }
+    });
+
+    if (newMsgAdded) {
+      const mainScroll = document.getElementById("chat-scroll-container");
+      if (mainScroll) {
+        mainScroll.scrollTop = mainScroll.scrollHeight;
+      }
+    }
+  }
+
   try {
     const wsProto = window.location.protocol === "https:" ? "wss://" : "ws://";
     chatSocket = new WebSocket(
@@ -514,9 +560,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     chatSocket.onclose = function(e) {
       console.error("Chat socket closed unexpectedly.");
+      startChatPolling();
     };
   } catch (err) {
     console.error("Failed to initialize WebSocket:", err);
+    startChatPolling();
   }
 
   const deleteRadios = document.querySelectorAll("input[name='delete_option']");
@@ -690,53 +738,111 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const notificationsContext = document.getElementById("notifications-context");
-  if (notificationsContext) {
-    const wsProto = window.location.protocol === "https:" ? "wss://" : "ws://";
-    const notificationSocket = new WebSocket(
-      wsProto + window.location.host + "/ws/notifications/"
-    );
+  let notificationPollInterval = null;
 
-    notificationSocket.onmessage = function(e) {
-      const data = JSON.parse(e.data);
-      const notification = data.notification;
-      
-      const row = document.getElementById("friend-row-" + notification.sender_id);
+  function startNotificationPolling() {
+    if (notificationPollInterval) return;
+    console.log("Fallback: Starting notification polling...");
+    pollNotifications();
+    notificationPollInterval = setInterval(pollNotifications, 3000);
+  }
+
+  function pollNotifications() {
+    fetch("/api/unread-chats/")
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === "success") {
+        updateNotificationRows(data.chats);
+      }
+    })
+    .catch(err => console.error("Error polling notifications:", err));
+  }
+
+  function updateNotificationRows(chats) {
+    chats.forEach(chat => {
+      const row = document.getElementById("friend-row-" + chat.friend_id);
       if (row) {
-        
-        const icon = row.querySelector("p i");
-        if (icon) {
-          icon.className = "fa-solid fa-comment text-red-500 fa-xs flex-shrink-0";
-        }
-        const statusSpan = row.querySelector("p span:nth-of-type(1)");
-        if (statusSpan) {
-          statusSpan.innerText = notification.text;
-          statusSpan.className = "text-red-500 font-bold truncate";
-        }
-        const timeSpan = row.querySelector("p span:nth-of-type(2)");
-        if (timeSpan) {
-          timeSpan.innerText = "Just now";
-        }
+        if (chat.has_unviewed) {
+          const icon = row.querySelector("p i");
+          if (icon) {
+            icon.className = `fa-solid ${chat.last_message_type === "image" ? "fa-square text-red-500" : "fa-comment text-red-500"} fa-xs flex-shrink-0`;
+          }
+          const statusSpan = row.querySelector("p span:nth-of-type(1)");
+          if (statusSpan) {
+            statusSpan.innerText = chat.last_message_type === "image" ? "New Snap" : "New Message";
+            statusSpan.className = "text-red-500 font-bold truncate";
+          }
+          const timeSpan = row.querySelector("p span:nth-of-type(2)");
+          if (timeSpan) {
+            timeSpan.innerText = chat.last_message_time;
+          }
 
-        const separatorSpan = row.querySelector("p span.size-1");
-        if (separatorSpan) {
-          separatorSpan.style.display = "";
-        }
+          const separatorSpan = row.querySelector("p span.size-1");
+          if (separatorSpan) {
+            separatorSpan.style.display = "";
+          }
 
-        row.classList.add("bg-yellow-50");
-        setTimeout(() => {
-          row.classList.remove("bg-yellow-50");
-        }, 3000);
-
-        const container = document.getElementById("chat-list-container");
-        if (container) {
-          container.prepend(row);
+          const container = document.getElementById("chat-list-container");
+          if (container && container.firstElementChild !== row) {
+            container.prepend(row);
+          }
         }
       }
-    };
+    });
+  }
 
-    notificationSocket.onclose = function(e) {
-      console.warn("Notification socket closed unexpectedly.");
-    };
+  if (notificationsContext) {
+    try {
+      const wsProto = window.location.protocol === "https:" ? "wss://" : "ws://";
+      const notificationSocket = new WebSocket(
+        wsProto + window.location.host + "/ws/notifications/"
+      );
+
+      notificationSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        const notification = data.notification;
+        
+        const row = document.getElementById("friend-row-" + notification.sender_id);
+        if (row) {
+          const icon = row.querySelector("p i");
+          if (icon) {
+            icon.className = `fa-solid ${notification.type === "image" ? "fa-square text-red-500" : "fa-comment text-red-500"} fa-xs flex-shrink-0`;
+          }
+          const statusSpan = row.querySelector("p span:nth-of-type(1)");
+          if (statusSpan) {
+            statusSpan.innerText = notification.text;
+            statusSpan.className = "text-red-500 font-bold truncate";
+          }
+          const timeSpan = row.querySelector("p span:nth-of-type(2)");
+          if (timeSpan) {
+            timeSpan.innerText = "Just now";
+          }
+
+          const separatorSpan = row.querySelector("p span.size-1");
+          if (separatorSpan) {
+            separatorSpan.style.display = "";
+          }
+
+          row.classList.add("bg-yellow-50");
+          setTimeout(() => {
+            row.classList.remove("bg-yellow-50");
+          }, 3000);
+
+          const container = document.getElementById("chat-list-container");
+          if (container) {
+            container.prepend(row);
+          }
+        }
+      };
+
+      notificationSocket.onclose = function(e) {
+        console.warn("Notification socket closed unexpectedly.");
+        startNotificationPolling();
+      };
+    } catch (err) {
+      console.error("Failed to initialize notification socket:", err);
+      startNotificationPolling();
+    }
   }
 });
 
@@ -746,6 +852,7 @@ function appendMessage(message, currentUserId) {
 
   if (message.is_system) {
     const sysDiv = document.createElement("div");
+    sysDiv.setAttribute("data-message-id", message.id);
     sysDiv.className = "flex justify-center my-2";
     sysDiv.innerHTML = `
       <span class="text-[10px] bg-gray-100 text-gray-500 px-3 py-1 rounded-full font-semibold border border-gray-200/50">
@@ -756,6 +863,7 @@ function appendMessage(message, currentUserId) {
   } else {
     const isMe = message.sender_id === currentUserId;
     const chatDiv = document.createElement("div");
+    chatDiv.setAttribute("data-message-id", message.id);
     chatDiv.className = `chat ${isMe ? "chat-end" : "chat-start"}`;
 
     let contentHtml = "";

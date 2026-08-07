@@ -60,13 +60,13 @@
     <div id="chat-messages-container" class="min-h-full flex flex-col justify-end px-4">
         {% for message in chat_messages %}
         {% if message.is_system %}
-        <div class="flex justify-center my-2">
+        <div class="flex justify-center my-2" data-message-id="{{ message.id }}">
             <span class="text-[10px] bg-gray-100 text-gray-500 px-3 py-1 rounded-full font-semibold border border-gray-200/50">
                 {{ message.text }}
             </span>
         </div>
         {% elif message.sender == request.user %}
-        <div class="chat chat-end">
+        <div class="chat chat-end" data-message-id="{{ message.id }}">
             <div class="chat-header">
                 {{ message.sender }}
                 <time class="text-xs opacity-50">{{ message.created_at | timesince }}</time>
@@ -80,7 +80,7 @@
             {% endif %}
         </div>
         {% else %}
-        <div class="chat chat-start">
+        <div class="chat chat-start" data-message-id="{{ message.id }}">
             <div class="chat-header">
                 {{ message.sender }}
                 <time class="text-xs opacity-50">{{ message.created_at | timesince }}</time>

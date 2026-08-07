@@ -19,5 +19,7 @@ urlpatterns = [
     path("map/update-location/", views.update_location, name="update-location"),
     path("map/toggle-ghost-mode/", views.toggle_ghost_mode, name="toggle-ghost-mode"),
     path("api/friends/", views.api_friends, name="api-friends"),
+    path("api/chat-messages/<int:friend_id>/", views.api_chat_messages, name="api-chat-messages"),
+    path("api/unread-chats/", views.api_unread_chats, name="api-unread-chats"),
     path("notifications/", views.notifications_view, name="notifications"),
 ]
