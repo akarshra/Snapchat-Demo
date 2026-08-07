@@ -81,12 +81,30 @@ ASGI_APPLICATION = "snapchat.asgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+if IS_VERCEL:
+    import shutil
+    db_path = "/tmp/db.sqlite3"
+    # Copy seed database to writable /tmp directory on Vercel startup
+    if not os.path.exists(db_path):
+        try:
+            shutil.copyfile(BASE_DIR / "db.sqlite3", db_path)
+        except Exception as e:
+            print(f"Error copying database to /tmp: {e}")
+    
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": db_path,
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
+
 
 
 # Password validation
