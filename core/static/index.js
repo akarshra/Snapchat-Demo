@@ -594,6 +594,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .then(data => {
         if (data.status === "success") {
           console.log("Delete option updated successfully.");
+          window.location.reload();
         } else {
           console.error("Failed to update delete option:", data.message);
         }

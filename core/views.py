@@ -516,6 +516,15 @@ def update_chat_delete_option(request, id):
         chat.model = delete_option
         chat.save()
         request.session[f"chat_model_{chat.id}"] = delete_option
+
+        # Apply deletion logic immediately
+        if delete_option == Chat.Model.ON_CLOSE:
+            Message.objects.filter(chat=chat, is_viewed=True).delete()
+        elif delete_option == Chat.Model.AFTER_24HR:
+            from datetime import timedelta
+            from django.utils import timezone
+            cutoff = timezone.now() - timedelta(hours=24)
+            Message.objects.filter(chat=chat, created_at__lt=cutoff).delete()
         
         return JsonResponse({"status": "success", "message": "Delete option updated."})
     except (json.JSONDecodeError, ValueError):
