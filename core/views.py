@@ -231,8 +231,8 @@ def chat_details_view(request, id):
     messages = list(messages)
 
     if chat.model == Chat.Model.ON_CLOSE:
-        recieved_messages = Message.objects.filter(reciever=request.user, sender=friend)
-        recieved_messages.delete()
+        # Delete all viewed messages in this chat
+        Message.objects.filter(chat=chat, is_viewed=True).delete()
 
     return render(
         request,

@@ -495,24 +495,29 @@ document.addEventListener("DOMContentLoaded", () => {
     mainScroll.scrollTop = mainScroll.scrollHeight;
   }
 
-  const wsProto = window.location.protocol === "https:" ? "wss://" : "ws://";
-  const chatSocket = new WebSocket(
-    wsProto + window.location.host + "/ws/chat/" + friendId + "/"
-  );
+  let chatSocket = null;
+  try {
+    const wsProto = window.location.protocol === "https:" ? "wss://" : "ws://";
+    chatSocket = new WebSocket(
+      wsProto + window.location.host + "/ws/chat/" + friendId + "/"
+    );
 
-  chatSocket.onmessage = function(e) {
-    const data = JSON.parse(e.data);
-    const message = data.message;
-    if (message.is_screenshot_alert) {
-      showScreenshotToast(message.text);
-    } else {
-      appendMessage(message, currentUserId);
-    }
-  };
+    chatSocket.onmessage = function(e) {
+      const data = JSON.parse(e.data);
+      const message = data.message;
+      if (message.is_screenshot_alert) {
+        showScreenshotToast(message.text);
+      } else {
+        appendMessage(message, currentUserId);
+      }
+    };
 
-  chatSocket.onclose = function(e) {
-    console.error("Chat socket closed unexpectedly.");
-  };
+    chatSocket.onclose = function(e) {
+      console.error("Chat socket closed unexpectedly.");
+    };
+  } catch (err) {
+    console.error("Failed to initialize WebSocket:", err);
+  }
 
   const deleteRadios = document.querySelectorAll("input[name='delete_option']");
   deleteRadios.forEach(radio => {
