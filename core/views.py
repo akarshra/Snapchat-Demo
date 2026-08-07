@@ -215,6 +215,10 @@ def chat_details_view(request, id):
     chat.model = request.session.get(f"chat_model_{chat.id}", chat.model)
     chat.show_streak = request.session.get(f"chat_show_streak_{chat.id}", chat.show_streak)
 
+    if chat.model == Chat.Model.ON_CLOSE:
+        # Delete previously viewed messages when entering the chat session
+        Message.objects.filter(chat=chat, is_viewed=True).delete()
+
     if chat.model == Chat.Model.AFTER_24HR:
         from datetime import timedelta
         cutoff = timezone.now() - timedelta(hours=24)
@@ -229,10 +233,6 @@ def chat_details_view(request, id):
     ).order_by("created_at")
 
     messages = list(messages)
-
-    if chat.model == Chat.Model.ON_CLOSE:
-        # Delete all viewed messages in this chat
-        Message.objects.filter(chat=chat, is_viewed=True).delete()
 
     return render(
         request,
@@ -661,15 +661,6 @@ def api_chat_messages(request, friend_id):
         Q(sender=request.user, reciever=friend)
         | Q(sender=friend, reciever=request.user)
     ).order_by("created_at")
-    
-    # Apply ON_CLOSE deletion logic
-    if chat.model == Chat.Model.ON_CLOSE:
-        Message.objects.filter(chat=chat, is_viewed=True).delete()
-        # Fetch remaining messages again
-        messages = Message.objects.filter(
-            Q(sender=request.user, reciever=friend)
-            | Q(sender=friend, reciever=request.user)
-        ).order_by("created_at")
 
     from django.utils.timesince import timesince
     
