@@ -685,12 +685,47 @@ document.addEventListener("DOMContentLoaded", () => {
         .catch(err => console.error("Error sending image snap:", err));
 
       } else if (messageText) {
-        
-        chatSocket.send(JSON.stringify({
-          "message": messageText,
-          "target": targetVal
-        }));
-        messageInput.value = "";
+        const isWsOpen = chatSocket && chatSocket.readyState === WebSocket.OPEN;
+        if (isWsOpen) {
+          chatSocket.send(JSON.stringify({
+            "message": messageText,
+            "target": targetVal
+          }));
+          messageInput.value = "";
+        } else {
+          // Fallback to fetch POST for serverless Vercel environment
+          const formData = new FormData();
+          formData.append("message", messageText);
+          formData.append("target", targetVal);
+
+          let csrf = "";
+          const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+          if (csrfInput) {
+            csrf = csrfInput.value;
+          } else {
+            const match = document.cookie.match(/csrftoken=([^;]+)/);
+            if (match) csrf = match[1];
+          }
+
+          fetch(chatForm.action, {
+            method: "POST",
+            headers: {
+              "X-CSRFToken": csrf,
+              "X-Requested-With": "XMLHttpRequest"
+            },
+            body: formData
+          })
+          .then(res => {
+            if (res.ok) {
+              messageInput.value = "";
+              // Immediately poll to show the new message
+              pollChatMessages();
+            } else {
+              console.error("Failed to send message via fetch");
+            }
+          })
+          .catch(err => console.error("Error sending message via fetch:", err));
+        }
       }
     });
   }
