@@ -103,9 +103,10 @@ def home(request):
 
     for friend in friends:
         chat = get_or_create_chat(request.user, friend)
+        show_streak = request.session.get(f"chat_show_streak_{chat.id}", chat.show_streak)
         streak_count, streak_active = chat.get_streak()
         friend.streak_count = streak_count
-        friend.streak_active = streak_active and chat.show_streak
+        friend.streak_active = streak_active and show_streak
 
         emoji = ""
         label = ""
@@ -211,6 +212,8 @@ def chat_details_view(request, id):
         return redirect("home")
 
     chat = get_or_create_chat(request.user, friend)
+    chat.model = request.session.get(f"chat_model_{chat.id}", chat.model)
+    chat.show_streak = request.session.get(f"chat_show_streak_{chat.id}", chat.show_streak)
 
     if chat.model == Chat.Model.AFTER_24HR:
         from datetime import timedelta
@@ -508,6 +511,7 @@ def update_chat_delete_option(request, id):
         chat = get_or_create_chat(request.user, friend)
         chat.model = delete_option
         chat.save()
+        request.session[f"chat_model_{chat.id}"] = delete_option
         
         return JsonResponse({"status": "success", "message": "Delete option updated."})
     except (json.JSONDecodeError, ValueError):
@@ -524,6 +528,7 @@ def update_chat_streak_option(request, id):
         chat = get_or_create_chat(request.user, friend)
         chat.show_streak = bool(show_streak)
         chat.save()
+        request.session[f"chat_show_streak_{chat.id}"] = bool(show_streak)
         
         return JsonResponse({"status": "success", "message": "Streak option updated."})
     except (json.JSONDecodeError, ValueError):
