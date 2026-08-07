@@ -28,10 +28,10 @@ DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
 
-# Application definition
+import os
+IS_VERCEL = "VERCEL" in os.environ
 
 INSTALLED_APPS = [
-    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -39,9 +39,13 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.humanize",
-    "channels",
     "core",
 ]
+
+if not IS_VERCEL:
+    INSTALLED_APPS.insert(0, "daphne")
+    INSTALLED_APPS.append("channels")
+
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
